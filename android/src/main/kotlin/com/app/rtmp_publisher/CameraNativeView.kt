@@ -8,10 +8,14 @@ import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
+import android.media.CamcorderProfile
 import android.util.Log
+import android.util.Size
+import android.view.OrientationEventListener
 import android.view.SurfaceHolder
 import android.view.View
 import android.widget.Toast
+import com.app.rtmp_publisher.Camera.ResolutionPreset
 import com.pedro.encoder.input.video.CameraHelper.Facing.BACK
 import com.pedro.encoder.input.video.CameraHelper.Facing.FRONT
 import com.pedro.rtplibrary.rtmp.RtmpCamera2
@@ -39,12 +43,54 @@ class CameraNativeView(
     private var isSurfaceCreated = false
     private var fps = 0
 
+    private var currentOrientation = OrientationEventListener.ORIENTATION_UNKNOWN
+    private val isFrontFacing: Boolean
+    private val cameraManager: CameraManager
+    private var currentFps = 30
+    private val sensorOrientation: Int
+    private val captureSize: Size
+    private val previewSize: Size
+    private val recordingProfile: CamcorderProfile
+    private val streamingProfile: CamcorderProfile
+    private val aspectRatio: Double = 5.0 / 4.0
+
     init {
         glView.isKeepAspectRatio = true
         glView.holder.addCallback(this)
         rtmpCamera = RtmpCamera2(glView, this)
         rtmpCamera.setReTries(10)
         rtmpCamera.setFpsListener { fps = it }
+        currentOrientation = 270
+
+        cameraManager = activity!!.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val characteristics = cameraManager.getCameraCharacteristics(cameraName)
+        isFrontFacing = characteristics.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_FRONT
+        sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)!!
+
+        recordingProfile = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
+        streamingProfile = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
+
+        captureSize = Size(recordingProfile.videoFrameWidth, recordingProfile.videoFrameHeight)
+        previewSize = CameraUtils.computeBestPreviewSize(cameraName, preset)
+    }
+
+    private val mediaOrientation: Int
+        get() {
+            val sensorOrientationOffset = if (isFrontFacing)
+                -currentOrientation
+            else
+                currentOrientation
+            return (sensorOrientationOffset + sensorOrientation + 360) % 360
+        }
+
+    private val isPortrait: Boolean = false
+
+    private fun getSizePairByOrientation(): Pair<Int, Int> {
+        return if (isPortrait) {
+            Pair((previewSize.width * aspectRatio).toInt(), previewSize.height)
+        } else {
+            Pair(previewSize.height, (previewSize.width * aspectRatio).toInt())
+        }
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -139,9 +185,11 @@ class CameraNativeView(
 
         if (!rtmpCamera.isStreaming()) {
             if (rtmpCamera.prepareAudio() && rtmpCamera.prepareVideo(
-                    streamingSize.videoFrameWidth,
                     streamingSize.videoFrameHeight,
-                    streamingSize.videoBitRate
+                    streamingSize.videoFrameWidth,
+                    currentFps,
+                    streamingSize.videoBitRate,
+                    270,
                 )
             ) {
                 rtmpCamera.startRecord(filePath)
@@ -163,9 +211,11 @@ class CameraNativeView(
             if (!rtmpCamera.isStreaming) {
                 val streamingSize = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
                 if (rtmpCamera.isRecording || rtmpCamera.prepareAudio() && rtmpCamera.prepareVideo(
-                        streamingSize.videoFrameWidth,
                         streamingSize.videoFrameHeight,
-                        bitrate ?: streamingSize.videoBitRate
+                        streamingSize.videoFrameWidth,
+                        currentFps,
+                        bitrate ?: streamingSize.videoBitRate,
+                        270,
                     )
                 ) {
                     // ready to start streaming
@@ -283,8 +333,9 @@ class CameraNativeView(
                 if (rtmpCamera.isOnPreview) {
                     rtmpCamera.stopPreview()
                 }
+                val streamingSize = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
+                rtmpCamera.startPreview(if (isFrontFacing) FRONT else BACK, streamingSize.videoFrameHeight, streamingSize.videoFrameWidth, 0)
 
-                rtmpCamera.startPreview(if (isFrontFacing(targetCamera)) FRONT else BACK, previewSize.width, previewSize.height)
             } catch (e: CameraAccessException) {
 //                close()
                 activity?.runOnUiThread { dartMessenger?.send(DartMessenger.EventType.ERROR, "CameraAccessException") }
@@ -315,11 +366,5 @@ class CameraNativeView(
     override fun dispose() {
         isSurfaceCreated = false
         activity = null
-    }
-
-    private fun isFrontFacing(cameraName: String): Boolean {
-        val cameraManager = activity?.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val characteristics = cameraManager.getCameraCharacteristics(cameraName)
-        return characteristics.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_FRONT
     }
 }

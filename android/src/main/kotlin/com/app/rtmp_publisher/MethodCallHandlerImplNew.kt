@@ -28,7 +28,7 @@ class MethodCallHandlerImplNew(
 
     private val methodChannel: MethodChannel
     private val imageStreamChannel: EventChannel
-    private var currentOrientation = OrientationEventListener.ORIENTATION_UNKNOWN
+    private var currentOrientation = 270
     private var dartMessenger: DartMessenger? = null
     private var nativeViewFactory: NativeViewFactory? = null
     private val handler = Handler()
@@ -206,8 +206,8 @@ class MethodCallHandlerImplNew(
             val previewSize = CameraUtils.computeBestPreviewSize(cameraName, preset)
             val reply: MutableMap<String, Any> = HashMap()
             reply["textureId"] = textureId
-            reply["previewWidth"] = previewSize.width
-            reply["previewHeight"] = previewSize.height
+            reply["previewWidth"] = previewSize.height
+            reply["previewHeight"] = previewSize.width
             reply["previewQuarterTurns"] = currentOrientation / 90
             Log.i(
                 "TAG",
