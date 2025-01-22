@@ -183,13 +183,13 @@ class CameraNativeView(
                 streamingSize.videoBitRate
             )*/
 
-        if (!rtmpCamera.isStreaming()) {
+        if (!rtmpCamera.isStreaming) {
             if (rtmpCamera.prepareAudio() && rtmpCamera.prepareVideo(
                     streamingSize.videoFrameHeight,
                     streamingSize.videoFrameWidth,
                     currentFps,
                     streamingSize.videoBitRate,
-                    270,
+                    0,
                 )
             ) {
                 rtmpCamera.startRecord(filePath)
@@ -211,11 +211,11 @@ class CameraNativeView(
             if (!rtmpCamera.isStreaming) {
                 val streamingSize = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
                 if (rtmpCamera.isRecording || rtmpCamera.prepareAudio() && rtmpCamera.prepareVideo(
-                        streamingSize.videoFrameHeight,
                         streamingSize.videoFrameWidth,
+                        streamingSize.videoFrameHeight,
                         currentFps,
                         bitrate ?: streamingSize.videoBitRate,
-                        270,
+                        90,
                     )
                 ) {
                     // ready to start streaming
@@ -334,8 +334,7 @@ class CameraNativeView(
                     rtmpCamera.stopPreview()
                 }
                 val streamingSize = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
-                rtmpCamera.startPreview(if (isFrontFacing) FRONT else BACK, streamingSize.videoFrameHeight, streamingSize.videoFrameWidth, 0)
-
+                rtmpCamera.startPreview(if (isFrontFacing) FRONT else BACK, streamingSize.videoFrameHeight, streamingSize.videoFrameWidth)
             } catch (e: CameraAccessException) {
 //                close()
                 activity?.runOnUiThread { dartMessenger?.send(DartMessenger.EventType.ERROR, "CameraAccessException") }

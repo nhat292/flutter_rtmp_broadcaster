@@ -202,12 +202,12 @@ class MethodCallHandlerImplNew(
             val enableAudio = call.argument<Boolean>("enableAudio")!!
             dartMessenger = DartMessenger(messenger, textureId)
 
-            val preset = Camera.ResolutionPreset.valueOf(resolutionPreset)
-            val previewSize = CameraUtils.computeBestPreviewSize(cameraName, preset)
+            val preset = Camera.ResolutionPreset.ultraHigh
+            val previewSize = CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset)
             val reply: MutableMap<String, Any> = HashMap()
             reply["textureId"] = textureId
-            reply["previewWidth"] = previewSize.height
-            reply["previewHeight"] = previewSize.width
+            reply["previewWidth"] = previewSize.videoFrameHeight
+            reply["previewHeight"] = previewSize.videoFrameWidth
             reply["previewQuarterTurns"] = currentOrientation / 90
             Log.i(
                 "TAG",
